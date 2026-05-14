@@ -1,0 +1,59 @@
+using Rocket.Core.Plugins;
+using Rocket.Core.Logging;
+using Rocket.Unturned.Player;
+using Rocket.Unturned.Events;
+using RPEkonomi.Data;
+using System;
+
+namespace RPEkonomi
+{
+    public class RPEkonomiPlugin : RocketPlugin<EkonomiConfig>
+    {
+        public static RPEkonomiPlugin Instance { get; private set; }
+        public EkonomiVeritabani Veritabani { get; private set; }
+
+        public override void LoadPlugin()
+        {
+            Instance = this;
+            Veritabani = new EkonomiVeritabani();
+            Veritabani.Yukle();
+
+            UnturnedPlayerEvents.OnPlayerConnected += OnPlayerConnected;
+            UnturnedPlayerEvents.OnPlayerDisconnected += OnPlayerDisconnected;
+
+            Logger.Log($"[RPEkonomi] Plugin yüklendi! Başlangıç parası: {Configuration.Instance.BaslangicParasi}₺");
+        }
+
+        public override void UnloadPlugin(PluginState state = PluginState.Unloaded)
+        {
+            UnturnedPlayerEvents.OnPlayerConnected -= OnPlayerConnected;
+            UnturnedPlayerEvents.OnPlayerDisconnected -= OnPlayerDisconnected;
+
+            Veritabani.Kaydet();
+            Logger.Log("[RPEkonomi] Plugin kapatıldı, veriler kaydedildi.");
+            Instance = null;
+        }
+
+        private void OnPlayerConnected(UnturnedPlayer player)
+        {
+            string steamId = player.CSteamID.ToString();
+
+            if (!Veritabani.OyuncuVarMi(steamId))
+            {
+                Veritabani.OyuncuEkle(steamId, player.DisplayName, Configuration.Instance.BaslangicParasi);
+                player.SendChat($"[Ekonomi] Hoş geldin {player.DisplayName}! Başlangıç paran: {Configuration.Instance.BaslangicParasi}₺");
+                Logger.Log($"[RPEkonomi] Yeni oyuncu kaydedildi: {player.DisplayName}");
+            }
+            else
+            {
+                decimal bakiye = Veritabani.ParaAl(steamId);
+                player.SendChat($"[Ekonomi] Tekrar hoş geldin {player.DisplayName}! Bakiyen: {bakiye}₺");
+            }
+        }
+
+        private void OnPlayerDisconnected(UnturnedPlayer player)
+        {
+            Veritabani.Kaydet();
+        }
+    }
+}
